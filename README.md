@@ -52,7 +52,32 @@ python main.py
 
 ---
 
-## 🛠️ Requirements
+## 🛠️ Requirements & Installation
 
 - Python 3.9+ (Fully compatible with Python 3.14+)
-- `pygame-ce>=2.5.0` (`pip install pygame-ce`)
+- Dependencies in `requirements.txt`:
+  ```bash
+  pip install -r requirements.txt
+  ```
+
+---
+
+## 🌐 Dual Experience: Desktop Game & Flask Web Portal
+
+### 1. Pygame Desktop Arcade:
+```bash
+python main.py
+```
+
+### 2. Flask Web Application & REST API:
+```bash
+python app.py
+```
+Open **[http://127.0.0.1:5000](http://127.0.0.1:5000)** in any modern web browser to play the Canvas edition, view live leaderboards, and browse the snack encyclopedia.
+
+#### Available Flask REST Endpoints:
+- `GET /api/highscore` — Fetch the global record from `highscore.json`.
+- `GET /api/leaderboard` — Retrieve the top 15 arcade champions.
+- `POST /api/score` — Submit player score (`{"player": "Name", "score": 350, "difficulty": "Classic"}`).
+- `GET /api/snacks` — View full specifications for all snacks.
+- `GET /api/health` — API health check.
