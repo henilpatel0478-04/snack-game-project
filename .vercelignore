@@ -1,0 +1,23 @@
+# Version control & cache
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Pygame desktop files (not needed for web deployment)
+main.py
+game.py
+snake.py
+snack.py
+sound_effects.py
+particles.py
+ui.py
+run_game.bat
+requirements-desktop.txt
+menu_preview.png
+gameplay_preview.png
+
+# Test suites
+tests/

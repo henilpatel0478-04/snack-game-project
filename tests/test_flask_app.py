@@ -16,6 +16,25 @@ class TestFlaskApp(unittest.TestCase):
     def setUp(self):
         app.config["TESTING"] = True
         self.client = app.test_client()
+        self.root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        self.lb_path = os.path.join(self.root_dir, "leaderboard.json")
+        self.hs_path = os.path.join(self.root_dir, "highscore.json")
+        self.lb_backup = None
+        self.hs_backup = None
+        if os.path.exists(self.lb_path):
+            with open(self.lb_path, "r", encoding="utf-8") as f:
+                self.lb_backup = f.read()
+        if os.path.exists(self.hs_path):
+            with open(self.hs_path, "r", encoding="utf-8") as f:
+                self.hs_backup = f.read()
+
+    def tearDown(self):
+        if self.lb_backup is not None:
+            with open(self.lb_path, "w", encoding="utf-8") as f:
+                f.write(self.lb_backup)
+        if self.hs_backup is not None:
+            with open(self.hs_path, "w", encoding="utf-8") as f:
+                f.write(self.hs_backup)
 
     def test_health_check(self):
         """Verify API health check endpoint."""
@@ -23,6 +42,11 @@ class TestFlaskApp(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data.get("status"), "ok")
+
+    def test_favicon(self):
+        """Verify favicon endpoint returns 204 without 404 error."""
+        response = self.client.get("/favicon.ico")
+        self.assertEqual(response.status_code, 204)
 
     def test_index_page(self):
         """Verify the main web portal HTML renders correctly."""

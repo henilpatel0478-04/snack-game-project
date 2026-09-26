@@ -7,27 +7,44 @@ import json
 from datetime import datetime
 from flask import Flask, jsonify, request, render_template
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Determine base directory with fallback checks for Vercel Serverless environment
+def _find_base_dir() -> str:
+    candidates = [
+        os.path.dirname(os.path.abspath(__file__)),
+        os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")),
+        os.getcwd()
+    ]
+    for path in candidates:
+        if os.path.isdir(os.path.join(path, "templates")):
+            return path
+    return os.path.dirname(os.path.abspath(__file__))
+
+BASE_DIR = _find_base_dir()
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 # Initialize Flask App with absolute template and static directories
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 
-# File paths (handle Vercel serverless read-only filesystem by using /tmp when deployed)
-IS_VERCEL = bool(os.environ.get("VERCEL"))
+# Detect serverless environment (Vercel, AWS Lambda, etc.)
+IS_SERVERLESS = bool(
+    os.environ.get("VERCEL") or 
+    os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or 
+    os.environ.get("LAMBDA_TASK_ROOT") or 
+    os.environ.get("NOW_REGION")
+)
 
 def get_read_path(filename: str) -> str:
-    """Return file path for reading, preferring /tmp on Vercel if updated."""
-    if IS_VERCEL:
+    """Return file path for reading, preferring /tmp on serverless if updated."""
+    if IS_SERVERLESS:
         tmp_file = os.path.join("/tmp", filename)
         if os.path.exists(tmp_file):
             return tmp_file
     return os.path.join(BASE_DIR, filename)
 
 def get_write_path(filename: str) -> str:
-    """Return file path for writing (use /tmp on Vercel to avoid read-only errors)."""
-    if IS_VERCEL:
+    """Return file path for writing (use /tmp on serverless to avoid read-only filesystem errors)."""
+    if IS_SERVERLESS:
         return os.path.join("/tmp", filename)
     return os.path.join(BASE_DIR, filename)
 
@@ -130,13 +147,14 @@ def save_high_score(score: int) -> bool:
     """Save high score to highscore.json if beaten."""
     current = load_high_score()
     if score > current:
-        try:
-            write_file = get_write_path("highscore.json")
-            with open(write_file, "w", encoding="utf-8") as f:
-                json.dump({"high_score": score}, f, indent=2)
-            return True
-        except IOError:
-            return False
+        paths = [get_write_path("highscore.json"), os.path.join("/tmp", "highscore.json")]
+        for write_file in paths:
+            try:
+                with open(write_file, "w", encoding="utf-8") as f:
+                    json.dump({"high_score": score}, f, indent=2)
+                return True
+            except OSError:
+                continue
     return False
 
 
@@ -147,7 +165,7 @@ def load_leaderboard():
         try:
             with open(read_file, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (json.JSONDecodeError, OSError):
             pass
     
     # Initialize with default arcade champions if none exist
@@ -158,12 +176,14 @@ def load_leaderboard():
         {"name": "ChiliKing", "score": int(high * 0.55), "date": "2026-09-24", "difficulty": "Frenzy", "snacks": 14},
         {"name": "RetroCoder", "score": int(high * 0.35), "date": "2026-09-23", "difficulty": "Chill", "snacks": 9},
     ]
-    try:
-        write_file = get_write_path("leaderboard.json")
-        with open(write_file, "w", encoding="utf-8") as f:
-            json.dump(default_entries, f, indent=2)
-    except IOError:
-        pass
+    paths = [get_write_path("leaderboard.json"), os.path.join("/tmp", "leaderboard.json")]
+    for write_file in paths:
+        try:
+            with open(write_file, "w", encoding="utf-8") as f:
+                json.dump(default_entries, f, indent=2)
+            break
+        except OSError:
+            continue
     return default_entries
 
 
@@ -182,15 +202,18 @@ def add_leaderboard_entry(name: str, score: int, difficulty: str = "Classic", sn
     entries.sort(key=lambda x: x["score"], reverse=True)
     entries = entries[:15]
 
-    try:
-        write_file = get_write_path("leaderboard.json")
-        with open(write_file, "w", encoding="utf-8") as f:
-            json.dump(entries, f, indent=2)
-    except IOError:
-        pass
+    paths = [get_write_path("leaderboard.json"), os.path.join("/tmp", "leaderboard.json")]
+    for write_file in paths:
+        try:
+            with open(write_file, "w", encoding="utf-8") as f:
+                json.dump(entries, f, indent=2)
+            break
+        except OSError:
+            continue
     
     # Check ranking
     rank = next((i + 1 for i, e in enumerate(entries) if e is new_entry), None)
+    return rank, entries
     return rank, entries
 
 
@@ -264,6 +287,12 @@ def health_check():
         "service": "Snack Attack Flask Web API",
         "version": "1.0.0"
     })
+
+
+@app.route("/favicon.ico")
+def favicon():
+    """Return 204 No Content for favicon requests to prevent 404 errors."""
+    return ("", 204)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,10 @@ if ROOT_DIR not in sys.path:
 
 from app import app
 
-# Vercel looks for 'app'
+# Export WSGI application callable for Vercel Serverless Functions
+handler = app
+application = app
+
+# Local development runner
 if __name__ == "__main__":
     app.run()
